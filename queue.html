@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Queue - HOMS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .navbar {
+            background-color: #2c3e50;
+            padding: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar h1 {
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            background-color: rgba(255,255,255,0.1);
+            transition: background-color 0.3s;
+        }
+
+        .nav-links a:hover {
+            background-color: rgba(255,255,255,0.2);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+        }
+
+        .status-row {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        th {
+            background-color: #34495e;
+            color: white;
+            padding: 1rem;
+            text-align: left;
+            font-weight: bold;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid #ddd;
+        }
+
+        tr:hover {
+            background-color: #f9f9f9;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.3s;
+        }
+
+        .btn-claim {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        .btn-claim:hover {
+            background-color: #229954;
+        }
+
+        .btn-complete {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .btn-complete:hover {
+            background-color: #2980b9;
+        }
+
+        .status-pending {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .status-in-progress {
+            color: #f39c12;
+            font-weight: bold;
+        }
+
+        .status-completed {
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        .status-cancelled {
+            color: #95a5a6;
+            font-weight: bold;
+        }
+
+        .error {
+            background-color: #e74c3c;
+            color: white;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .success {
+            background-color: #27ae60;
+            color: white;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>HOMS</h1>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="queue.html">Queue</a>
+            <a href="submit.html">Submit Order</a>
+            <a href="audit.html">Audit Log</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Order Queue</h2>
+        <div class="status-row">Last updated: <span id="lastUpdated">Loading...</span></div>
+        <div id="message"></div>
+        <div id="queueContainer" class="loading">Loading orders...</div>
+    </div>
+
+    <script>
+        const API_BASE = "https://healthcare-management-part1.onrender.com";
+
+        function formatTime(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+
+        function getStatusClass(status) {
+            switch(status) {
+                case 'PENDING': return 'status-pending';
+                case 'IN_PROGRESS': return 'status-in-progress';
+                case 'COMPLETED': return 'status-completed';
+                case 'CANCELLED': return 'status-cancelled';
+                default: return '';
+            }
+        }
+
+        function claimOrder(orderId) {
+            const staffId = prompt("Enter your staff ID:");
+            if (!staffId) return;
+
+            fetch(`${API_BASE}/api/orders/${orderId}/claim`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ staffId: staffId })
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to claim order');
+                return response.json();
+            })
+            .then(() => {
+                showMessage('Order claimed successfully', 'success');
+                loadOrders();
+            })
+            .catch(error => {
+                showMessage('Error: ' + error.message, 'error');
+            });
+        }
+
+        function completeOrder(orderId) {
+            const staffId = prompt("Enter your staff ID:");
+            if (!staffId) return;
+
+            fetch(`${API_BASE}/api/orders/${orderId}/complete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ staffId: staffId })
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to complete order');
+                return response.json();
+            })
+            .then(() => {
+                showMessage('Order completed successfully', 'success');
+                loadOrders();
+            })
+            .catch(error => {
+                showMessage('Error: ' + error.message, 'error');
+            });
+        }
+
+        function showMessage(msg, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.className = type;
+            messageDiv.textContent = msg;
+            setTimeout(() => {
+                messageDiv.textContent = '';
+                messageDiv.className = '';
+            }, 3000);
+        }
+
+        function loadOrders() {
+            fetch(`${API_BASE}/api/orders`)
+                .then(response => response.json())
+                .then(orders => {
+                    displayOrders(orders);
+                    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+                })
+                .catch(error => {
+                    document.getElementById('queueContainer').innerHTML = 
+                        `<div class="error">Error loading orders: ${error.message}</div>`;
+                });
+        }
+
+        function displayOrders(orders) {
+            if (orders.length === 0) {
+                document.getElementById('queueContainer').innerHTML = '<p>No orders in queue.</p>';
+                return;
+            }
+
+            let html = '<table><thead><tr><th>Order ID</th><th>Type</th><th>Patient</th><th>Clinician</th><th>Priority</th><th>Status</th><th>Claimed By</th><th>Actions</th></tr></thead><tbody>';
+
+            orders.forEach(order => {
+                const statusClass = getStatusClass(order.status);
+                let actions = '';
+
+                if (order.status === 'PENDING') {
+                    actions = `<button class="btn btn-claim" onclick="claimOrder('${order.orderId}')">Claim</button>`;
+                } else if (order.status === 'IN_PROGRESS') {
+                    actions = `<button class="btn btn-complete" onclick="completeOrder('${order.orderId}')">Complete</button>`;
+                }
+
+                html += `<tr>
+                    <td>${order.orderId.substring(0, 8)}...</td>
+                    <td>${order.type}</td>
+                    <td>${order.patientName}</td>
+                    <td>${order.clinician}</td>
+                    <td>${order.priority}</td>
+                    <td class="${statusClass}">${order.status}</td>
+                    <td>${order.claimedBy || '-'}</td>
+                    <td>${actions}</td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            document.getElementById('queueContainer').innerHTML = html;
+        }
+
+        loadOrders();
+        setInterval(loadOrders, 3000);
+    </script>
+</body>
+</html>
