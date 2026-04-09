@@ -376,7 +376,7 @@
                         <div class="notification-desc">System console messages</div>
                     </label>
 
-                    <label class="notification-card" id="inapp-pref">
+                    <label class="notification-card" id="in-app-pref">
                         <div class="notification-label">
                             <input type="checkbox" name="notificationChannel" value="IN_APP">
                             In-App Alert
@@ -428,7 +428,10 @@
             });
             document.querySelectorAll('input[name="notificationChannel"]:checked').forEach(checkbox => {
                 const value = checkbox.value.toLowerCase().replace('_', '-');
-                document.getElementById(`${value}-pref`).classList.add('checked');
+                const cardElement = document.getElementById(`${value}-pref`);
+                if (cardElement) {
+                    cardElement.classList.add('checked');
+                }
             });
         }
 
@@ -448,6 +451,10 @@
         function applyStrategy() {
             const selectedStrategy = document.querySelector('input[name="triageStrategy"]:checked').value;
             
+            localStorage.setItem('selectedTriageStrategy', selectedStrategy);
+            currentActiveStrategy = selectedStrategy;
+            document.getElementById('currentStrategyName').textContent = STRATEGIES[selectedStrategy];
+
             fetch(`${API_BASE}/api/triage/strategy`, {
                 method: 'POST',
                 headers: {
@@ -464,8 +471,6 @@
                 return response.json();
             })
             .then(() => {
-                currentActiveStrategy = selectedStrategy;
-                document.getElementById('currentStrategyName').textContent = STRATEGIES[selectedStrategy];
                 showMessage(`Strategy applied: ${STRATEGIES[selectedStrategy]}`, 'success');
             })
             .catch(error => {
@@ -482,6 +487,9 @@
                 showMessage('Please select at least one notification channel', 'error');
                 return;
             }
+
+            // Save to localStorage immediately
+            localStorage.setItem('notificationChannels', JSON.stringify(selectedChannels));
 
             fetch(`${API_BASE}/api/notifications/preferences`, {
                 method: 'POST',
@@ -500,7 +508,6 @@
             })
             .then(data => {
                 showMessage(`Notification channels updated: ${data.activeChannels.join(', ')}`, 'success');
-                localStorage.setItem('notificationChannels', JSON.stringify(selectedChannels));
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -509,25 +516,58 @@
         }
 
         function loadCurrentStrategy() {
+            // Load from localStorage first
+            const saved = localStorage.getItem('selectedTriageStrategy');
+            if (saved) {
+                currentActiveStrategy = saved;
+                const input = document.querySelector(`input[value="${currentActiveStrategy}"]`);
+                if (input) input.checked = true;
+                document.getElementById('currentStrategyName').textContent = STRATEGIES[currentActiveStrategy];
+                updateCardSelection();
+            }
+
+            // Then sync with backend
             fetch(`${API_BASE}/api/triage/strategy`)
                 .then(response => {
                     if (!response.ok) throw new Error('Failed to load strategy');
                     return response.json();
                 })
                 .then(data => {
-                    currentActiveStrategy = data.strategy || "PRIORITY_FIFO";
-                    document.querySelector(`input[value="${currentActiveStrategy}"]`).checked = true;
-                    document.getElementById('currentStrategyName').textContent = STRATEGIES[currentActiveStrategy];
-                    updateCardSelection();
+                    const backendStrategy = data.strategy || "PRIORITY_FIFO";
+                    if (backendStrategy !== currentActiveStrategy) {
+                        currentActiveStrategy = backendStrategy;
+                        localStorage.setItem('selectedTriageStrategy', backendStrategy);
+                        document.querySelector(`input[value="${currentActiveStrategy}"]`).checked = true;
+                        document.getElementById('currentStrategyName').textContent = STRATEGIES[currentActiveStrategy];
+                        updateCardSelection();
+                    }
                 })
                 .catch(error => {
                     console.error('Error loading strategy:', error);
-                    currentActiveStrategy = "PRIORITY_FIFO";
-                    updateCardSelection();
+                    if (!currentActiveStrategy) {
+                        currentActiveStrategy = "PRIORITY_FIFO";
+                        localStorage.setItem('selectedTriageStrategy', currentActiveStrategy);
+                        updateCardSelection();
+                    }
                 });
         }
 
         function loadNotificationPreferences() {
+            // Load from localStorage first
+            const saved = localStorage.getItem('notificationChannels');
+            if (saved) {
+                try {
+                    const channels = JSON.parse(saved);
+                    document.querySelectorAll('input[name="notificationChannel"]').forEach(checkbox => {
+                        checkbox.checked = channels.includes(checkbox.value);
+                    });
+                    updateNotificationCardSelection();
+                } catch (e) {
+                    console.error('Error parsing saved notification channels:', e);
+                }
+            }
+
+            // Then sync with backend
             fetch(`${API_BASE}/api/notifications/preferences`)
                 .then(response => {
                     if (!response.ok) throw new Error('Failed to load preferences');
@@ -535,22 +575,32 @@
                 })
                 .then(data => {
                     if (data.activeChannels && Array.isArray(data.activeChannels)) {
-                        document.querySelectorAll('input[name="notificationChannel"]').forEach(checkbox => {
-                            checkbox.checked = data.activeChannels.includes(checkbox.value);
-                        });
-                        localStorage.setItem('notificationChannels', JSON.stringify(data.activeChannels));
-                        updateNotificationCardSelection();
+                        const currentChannels = JSON.parse(localStorage.getItem('notificationChannels') || '[]');
+                        const hasDifference = data.activeChannels.length !== currentChannels.length ||
+                            !data.activeChannels.every(ch => currentChannels.includes(ch));
+                        
+                        if (hasDifference) {
+                            document.querySelectorAll('input[name="notificationChannel"]').forEach(checkbox => {
+                                checkbox.checked = data.activeChannels.includes(checkbox.value);
+                            });
+                            localStorage.setItem('notificationChannels', JSON.stringify(data.activeChannels));
+                            updateNotificationCardSelection();
+                        }
                     }
                 })
                 .catch(error => {
                     console.error('Error loading preferences:', error);
                     const saved = localStorage.getItem('notificationChannels');
                     if (saved) {
-                        const channels = JSON.parse(saved);
-                        document.querySelectorAll('input[name="notificationChannel"]').forEach(checkbox => {
-                            checkbox.checked = channels.includes(checkbox.value);
-                        });
-                        updateNotificationCardSelection();
+                        try {
+                            const channels = JSON.parse(saved);
+                            document.querySelectorAll('input[name="notificationChannel"]').forEach(checkbox => {
+                                checkbox.checked = channels.includes(checkbox.value);
+                            });
+                            updateNotificationCardSelection();
+                        } catch (e) {
+                            console.error('Error parsing notification channels:', e);
+                        }
                     }
                 });
         }
