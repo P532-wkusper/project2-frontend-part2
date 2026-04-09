@@ -169,6 +169,36 @@
             color: #666;
         }
 
+        .navbar-badge-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .navbar-badge-label {
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        .navbar-badge {
+            display: none;
+            background-color: #e74c3c;
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            position: absolute;
+            top: -8px;
+            right: -8px;
+        }
+
+        .navbar-badge.visible {
+            display: flex;
+        }
+
         .status-section {
             margin-bottom: 2rem;
             background-color: white;
@@ -237,6 +267,10 @@
             <a href="queue.html">Queue</a>
             <a href="submit.html">Submit Order</a>
             <a href="audit.html">Audit Log</a>
+        </div>
+        <div class="navbar-badge-container">
+            <span class="navbar-badge-label">Notifications</span>
+            <span id="badgeBadge" class="navbar-badge">0</span>
         </div>
     </div>
 
@@ -479,6 +513,27 @@
 
         loadOrders();
         setInterval(loadOrders, 3000);
+    </script>
+
+    <script>
+        function updateBadgeDisplay() {
+            const badge = document.getElementById('badgeBadge');
+            if (badge) {
+                const count = 0;
+                badge.textContent = count;
+                if (count > 0) {
+                    badge.classList.add('visible');
+                } else {
+                    badge.classList.remove('visible');
+                }
+            }
+        }
+
+        window.addEventListener('load', () => {
+            updateBadgeDisplay();
+        });
+
+        setInterval(updateBadgeDisplay, 5000);
     </script>
 </body>
 </html>

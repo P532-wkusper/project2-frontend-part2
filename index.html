@@ -218,11 +218,99 @@
             background-color: #e74c3c;
             color: white;
         }
+
+        .navbar-badge-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .navbar-badge-label {
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        .navbar-badge {
+            display: none;
+            background-color: #e74c3c;
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            position: absolute;
+            top: -8px;
+            right: -8px;
+        }
+
+        .navbar-badge.visible {
+            display: flex;
+        }
+
+        .notification-preferences {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 2px solid #ecf0f1;
+        }
+
+        .notification-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .notification-card {
+            border: 2px solid #bdc3c7;
+            border-radius: 4px;
+            padding: 1rem;
+            background-color: #f9f9f9;
+            transition: all 0.3s;
+        }
+
+        .notification-card:hover {
+            border-color: #3498db;
+            background-color: #ecf0f1;
+        }
+
+        .notification-card input[type="checkbox"] {
+            margin-right: 0.5rem;
+            cursor: pointer;
+        }
+
+        .notification-card.checked {
+            border-color: #27ae60;
+            background-color: #e8f8f5;
+        }
+
+        .notification-label {
+            font-weight: bold;
+            color: #2c3e50;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+
+        .notification-desc {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 0.5rem;
+            margin-left: 1.5rem;
+        }
+    
     </style>
 </head>
 <body>
     <div class="navbar">
-        <h1>Hospital Order Management System</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <h1>Hospital Order Management System</h1>
+            <div class="navbar-badge-container">
+                <span class="navbar-badge-label">Notifications</span>
+                <span id="badgeBadge" class="navbar-badge">0</span>
+            </div>
+        </div>
     </div>
 
     <div class="container">
@@ -273,6 +361,40 @@
             </div>
 
             <button class="apply-btn" onclick="applyStrategy()">Apply Strategy</button>
+
+            <div class="notification-preferences">
+                <div class="settings-title">Notification Preferences</div>
+                
+                <p style="font-size: 0.9rem; color: #666; margin-bottom: 1.5rem;">Select notification channels:</p>
+
+                <div class="notification-grid">
+                    <label class="notification-card" id="console-pref">
+                        <div class="notification-label">
+                            <input type="checkbox" name="notificationChannel" value="CONSOLE" checked>
+                            Console Log
+                        </div>
+                        <div class="notification-desc">System console messages</div>
+                    </label>
+
+                    <label class="notification-card" id="inapp-pref">
+                        <div class="notification-label">
+                            <input type="checkbox" name="notificationChannel" value="IN_APP">
+                            In-App Alert
+                        </div>
+                        <div class="notification-desc">Badge counter update</div>
+                    </label>
+
+                    <label class="notification-card" id="email-pref">
+                        <div class="notification-label">
+                            <input type="checkbox" name="notificationChannel" value="EMAIL">
+                            Email Summary
+                        </div>
+                        <div class="notification-desc">Email notification</div>
+                    </label>
+                </div>
+
+                <button class="apply-btn" onclick="applyNotificationPreferences()">Apply Preferences</button>
+            </div>
         </div>
     </div>
 
@@ -292,6 +414,16 @@
                 card.classList.remove('selected');
             });
             document.getElementById(`${selected.toLowerCase().replace('_', '-')}-card`).classList.add('selected');
+        }
+
+        function updateNotificationCardSelection() {
+            document.querySelectorAll('.notification-card').forEach(card => {
+                card.classList.remove('checked');
+            });
+            document.querySelectorAll('input[name="notificationChannel"]:checked').forEach(checkbox => {
+                const value = checkbox.value.toLowerCase().replace('_', '-');
+                document.getElementById(`${value}-pref`).classList.add('checked');
+            });
         }
 
         function showMessage(message, type = 'info') {
@@ -336,6 +468,40 @@
             });
         }
 
+        function applyNotificationPreferences() {
+            const selectedChannels = Array.from(document.querySelectorAll('input[name="notificationChannel"]:checked'))
+                .map(checkbox => checkbox.value);
+            
+            if (selectedChannels.length === 0) {
+                showMessage('Please select at least one notification channel', 'error');
+                return;
+            }
+
+            fetch(`${API_BASE}/api/notifications/preferences`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ channels: selectedChannels })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.error || 'Failed to apply preferences');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                showMessage(`Notification channels updated: ${data.activeChannels.join(', ')}`, 'success');
+                localStorage.setItem('notificationChannels', JSON.stringify(selectedChannels));
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage(`Error: ${error.message}`, 'error');
+            });
+        }
+
         function loadCurrentStrategy() {
             fetch(`${API_BASE}/api/triage/strategy`)
                 .then(response => {
@@ -355,14 +521,58 @@
                 });
         }
 
+        function loadNotificationPreferences() {
+            fetch(`${API_BASE}/api/notifications/preferences`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to load preferences');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.activeChannels && Array.isArray(data.activeChannels)) {
+                        document.querySelectorAll('input[name="notificationChannel"]').forEach(checkbox => {
+                            checkbox.checked = data.activeChannels.includes(checkbox.value);
+                        });
+                        localStorage.setItem('notificationChannels', JSON.stringify(data.activeChannels));
+                        updateNotificationCardSelection();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading preferences:', error);
+                    const saved = localStorage.getItem('notificationChannels');
+                    if (saved) {
+                        const channels = JSON.parse(saved);
+                        document.querySelectorAll('input[name="notificationChannel"]').forEach(checkbox => {
+                            checkbox.checked = channels.includes(checkbox.value);
+                        });
+                        updateNotificationCardSelection();
+                    }
+                });
+        }
+
         document.querySelectorAll('input[name="triageStrategy"]').forEach(radio => {
             radio.addEventListener('change', updateCardSelection);
+        });
+
+        document.querySelectorAll('input[name="notificationChannel"]').forEach(checkbox => {
+            checkbox.addEventListener('change', updateNotificationCardSelection);
         });
 
         window.addEventListener('load', () => {
             loadCurrentStrategy();
             updateCardSelection();
+            loadNotificationPreferences();
+            updateBadgeCounter();
         });
+
+        setInterval(updateBadgeCounter, 5000);
+
+        function updateBadgeCounter() {
+            const badge = document.getElementById('badgeBadge');
+            if (badge) {
+                badge.textContent = '0';
+                badge.classList.remove('visible');
+            }
+        }
     </script>
 </body>
 </html>
