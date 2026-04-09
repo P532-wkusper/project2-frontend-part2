@@ -325,7 +325,11 @@
                 body: JSON.stringify({ clinician: clinician })
             })
             .then(response => {
-                if (!response.ok) throw new Error('Failed to cancel order');
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.error || `Failed to cancel order (${response.status})`);
+                    });
+                }
                 return response.json();
             })
             .then(() => {
