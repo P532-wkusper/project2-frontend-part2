@@ -168,6 +168,65 @@
             padding: 2rem;
             color: #666;
         }
+
+        .status-section {
+            margin-bottom: 2rem;
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .status-section-header {
+            background-color: #34495e;
+            color: white;
+            padding: 1rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+            transition: background-color 0.3s;
+        }
+
+        .status-section-header:hover {
+            background-color: #2c3e50;
+        }
+
+        .status-section-header .toggle-icon {
+            font-size: 1.2rem;
+            transition: transform 0.3s;
+        }
+
+        .status-section-header.collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+
+        .status-section-content {
+            max-height: 2000px;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .status-section-content.collapsed {
+            max-height: 0;
+        }
+
+        .status-section table {
+            margin: 0;
+            box-shadow: none;
+        }
+
+        .status-section-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+
+        .status-section-count {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-left: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -301,10 +360,25 @@
                 });
         }
 
-        function displayOrders(orders) {
+        function getPriorityValue(priority) {
+            const priorityMap = {
+                'STAT': 0,
+                'URGENT': 1,
+                'ROUTINE': 2
+            };
+            return priorityMap[priority] !== undefined ? priorityMap[priority] : 999;
+        }
+
+        function toggleSection(sectionId) {
+            const header = document.getElementById(`header-${sectionId}`);
+            const content = document.getElementById(`content-${sectionId}`);
+            header.classList.toggle('collapsed');
+            content.classList.toggle('collapsed');
+        }
+
+        function createOrderTable(orders) {
             if (orders.length === 0) {
-                document.getElementById('queueContainer').innerHTML = '<p>No orders in queue.</p>';
-                return;
+                return '<p style="padding: 1rem;">No orders</p>';
             }
 
             let html = '<table><thead><tr><th>Order ID</th><th>Type</th><th>Patient</th><th>Clinician</th><th>Priority</th><th>Status</th><th>Claimed By</th><th>Actions</th></tr></thead><tbody>';
@@ -333,6 +407,72 @@
             });
 
             html += '</tbody></table>';
+            return html;
+        }
+
+        function displayOrders(orders) {
+            if (orders.length === 0) {
+                document.getElementById('queueContainer').innerHTML = '<p>No orders in queue.</p>';
+                return;
+            }
+
+            orders.sort((a, b) => getPriorityValue(a.priority) - getPriorityValue(b.priority));
+
+            // Group orders by status
+            const openOrders = orders.filter(o => o.status === 'PENDING');
+            const inProgressOrders = orders.filter(o => o.status === 'IN_PROGRESS');
+            const completedOrders = orders.filter(o => o.status === 'COMPLETED' || o.status === 'CANCELLED');
+
+            let html = '';
+
+            // Open Orders Section
+            html += `
+                <div class="status-section">
+                    <div class="status-section-header" id="header-open" onclick="toggleSection('open')">
+                        <div class="status-section-title">
+                            Open Orders
+                            <span class="status-section-count">(${openOrders.length})</span>
+                        </div>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="status-section-content" id="content-open">
+                        ${createOrderTable(openOrders)}
+                    </div>
+                </div>
+            `;
+
+            // In Progress Orders Section
+            html += `
+                <div class="status-section">
+                    <div class="status-section-header" id="header-inprogress" onclick="toggleSection('inprogress')">
+                        <div class="status-section-title">
+                            In Progress Orders
+                            <span class="status-section-count">(${inProgressOrders.length})</span>
+                        </div>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="status-section-content" id="content-inprogress">
+                        ${createOrderTable(inProgressOrders)}
+                    </div>
+                </div>
+            `;
+
+            // Completed/Cancelled Orders Section
+            html += `
+                <div class="status-section">
+                    <div class="status-section-header" id="header-closed" onclick="toggleSection('closed')">
+                        <div class="status-section-title">
+                            Completed/Cancelled Orders
+                            <span class="status-section-count">(${completedOrders.length})</span>
+                        </div>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="status-section-content collapsed" id="content-closed">
+                        ${createOrderTable(completedOrders)}
+                    </div>
+                </div>
+            `;
+
             document.getElementById('queueContainer').innerHTML = html;
         }
 
