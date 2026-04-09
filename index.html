@@ -338,21 +338,21 @@
             <p style="font-size: 0.9rem; color: #666; margin-bottom: 1.5rem;">Select how orders should be prioritized:</p>
 
             <div class="strategy-grid">
-                <label class="strategy-card" id="fifo-card">
+                <label class="strategy-card" id="priority-fifo-card">
                     <div class="strategy-name">
                         <input type="radio" name="triageStrategy" value="PRIORITY_FIFO" checked>
                         Priority FIFO
                     </div>
                 </label>
 
-                <label class="strategy-card" id="load-balance-card">
+                <label class="strategy-card" id="load-balancing-card">
                     <div class="strategy-name">
                         <input type="radio" name="triageStrategy" value="LOAD_BALANCING">
                         Load Balancing
                     </div>
                 </label>
 
-                <label class="strategy-card" id="deadline-card">
+                <label class="strategy-card" id="deadline-first-card">
                     <div class="strategy-name">
                         <input type="radio" name="triageStrategy" value="DEADLINE_FIRST">
                         Deadline First
@@ -409,11 +409,17 @@
         };
 
         function updateCardSelection() {
-            const selected = document.querySelector('input[name="triageStrategy"]:checked').value;
+            const checkedInput = document.querySelector('input[name="triageStrategy"]:checked');
+            if (!checkedInput) return;
+            
+            const selected = checkedInput.value;
             document.querySelectorAll('.strategy-card').forEach(card => {
                 card.classList.remove('selected');
             });
-            document.getElementById(`${selected.toLowerCase().replace('_', '-')}-card`).classList.add('selected');
+            const cardElement = document.getElementById(`${selected.toLowerCase().replace('_', '-')}-card`);
+            if (cardElement) {
+                cardElement.classList.add('selected');
+            }
         }
 
         function updateNotificationCardSelection() {
