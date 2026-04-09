@@ -96,6 +96,128 @@
         .btn-success:hover {
             background-color: #229954;
         }
+
+        .settings-panel {
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 2rem;
+            margin-top: 3rem;
+        }
+
+        .settings-title {
+            font-size: 1.3rem;
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+            font-weight: bold;
+            border-bottom: 2px solid #34495e;
+            padding-bottom: 0.75rem;
+        }
+
+        .strategy-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .strategy-card {
+            border: 2px solid #bdc3c7;
+            border-radius: 4px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            background-color: #f9f9f9;
+        }
+
+        .strategy-card:hover {
+            border-color: #3498db;
+            background-color: #ecf0f1;
+        }
+
+        .strategy-card input[type="radio"] {
+            margin-right: 0.5rem;
+            cursor: pointer;
+        }
+
+        .strategy-card.selected {
+            border-color: #27ae60;
+            background-color: #e8f8f5;
+        }
+
+        .strategy-name {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .strategy-description {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .current-strategy {
+            background-color: #e8f8f5;
+            border: 2px solid #27ae60;
+            border-radius: 4px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .strategy-status {
+            color: #27ae60;
+            font-weight: bold;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        .strategy-value {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-top: 0.5rem;
+            font-weight: bold;
+        }
+
+        .apply-btn {
+            background-color: #27ae60;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+        .apply-btn:hover {
+            background-color: #229954;
+        }
+
+        .apply-btn:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .message {
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            font-weight: bold;
+        }
+
+        .message.success {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        .message.error {
+            background-color: #e74c3c;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -114,6 +236,136 @@
                 <a href="audit.html" class="btn btn-secondary">View Audit Log</a>
             </div>
         </div>
+
+        <div class="settings-panel">
+            <div class="settings-title">Triage Strategy Configuration</div>
+            
+            <div id="messageContainer"></div>
+            
+            <div class="current-strategy">
+                <div class="strategy-status">Currently Active Strategy</div>
+                <div class="strategy-value" id="currentStrategyName">Priority FIFO</div>
+            </div>
+
+            <p style="font-size: 0.9rem; color: #666; margin-bottom: 1.5rem;">Select how orders should be prioritized:</p>
+
+            <div class="strategy-grid">
+                <label class="strategy-card" id="fifo-card">
+                    <div class="strategy-name">
+                        <input type="radio" name="triageStrategy" value="PRIORITY_FIFO" checked>
+                        Priority FIFO
+                    </div>
+                    <div class="strategy-description">Orders processed by priority (STAT → URGENT → ROUTINE), then by arrival time</div>
+                </label>
+
+                <label class="strategy-card" id="load-balance-card">
+                    <div class="strategy-name">
+                        <input type="radio" name="triageStrategy" value="LOAD_BALANCING">
+                        Load Balancing
+                    </div>
+                    <div class="strategy-description">Orders distributed evenly across available staff based on current workload</div>
+                </label>
+
+                <label class="strategy-card" id="deadline-card">
+                    <div class="strategy-name">
+                        <input type="radio" name="triageStrategy" value="DEADLINE_FIRST">
+                        Deadline First
+                    </div>
+                    <div class="strategy-description">Orders prioritized by deadline based on type and priority level</div>
+                </label>
+            </div>
+
+            <button class="apply-btn" onclick="applyStrategy()">Apply Strategy</button>
+        </div>
     </div>
+
+    <script>
+        const API_BASE = "https://healthcare-management-part2.onrender.com";
+        let currentActiveStrategy = "PRIORITY_FIFO";
+
+        const STRATEGIES = {
+            PRIORITY_FIFO: "Priority FIFO",
+            LOAD_BALANCING: "Load Balancing",
+            DEADLINE_FIRST: "Deadline First"
+        };
+
+        function updateCardSelection() {
+            const selected = document.querySelector('input[name="triageStrategy"]:checked').value;
+            document.querySelectorAll('.strategy-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            document.getElementById(`${selected.toLowerCase().replace('_', '-')}-card`).classList.add('selected');
+        }
+
+        function showMessage(message, type = 'info') {
+            const container = document.getElementById('messageContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = message;
+            container.innerHTML = '';
+            container.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 5000);
+        }
+
+        function applyStrategy() {
+            const selectedStrategy = document.querySelector('input[name="triageStrategy"]:checked').value;
+            
+            fetch(`${API_BASE}/api/triage/strategy`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ strategy: selectedStrategy })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.error || 'Failed to apply strategy');
+                    });
+                }
+                return response.json();
+            })
+            .then(() => {
+                currentActiveStrategy = selectedStrategy;
+                document.getElementById('currentStrategyName').textContent = STRATEGIES[selectedStrategy];
+                showMessage(`Strategy applied: ${STRATEGIES[selectedStrategy]}`, 'success');
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage(`Error: ${error.message}`, 'error');
+            });
+        }
+
+        function loadCurrentStrategy() {
+            fetch(`${API_BASE}/api/triage/strategy`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to load strategy');
+                    return response.json();
+                })
+                .then(data => {
+                    currentActiveStrategy = data.strategy || "PRIORITY_FIFO";
+                    document.querySelector(`input[value="${currentActiveStrategy}"]`).checked = true;
+                    document.getElementById('currentStrategyName').textContent = STRATEGIES[currentActiveStrategy];
+                    updateCardSelection();
+                })
+                .catch(error => {
+                    console.error('Error loading strategy:', error);
+                    currentActiveStrategy = "PRIORITY_FIFO";
+                    updateCardSelection();
+                });
+        }
+
+        document.querySelectorAll('input[name="triageStrategy"]').forEach(radio => {
+            radio.addEventListener('change', updateCardSelection);
+        });
+
+        window.addEventListener('load', () => {
+            loadCurrentStrategy();
+            updateCardSelection();
+        });
+    </script>
 </body>
 </html>
