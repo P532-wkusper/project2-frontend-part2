@@ -400,13 +400,28 @@
 
     <script>
         const API_BASE = "https://healthcare-management-part2.onrender.com";
-        let currentActiveStrategy = "PRIORITY_FIFO";
+        let currentActiveStrategy = localStorage.getItem('selectedTriageStrategy') || "PRIORITY_FIFO";
 
         const STRATEGIES = {
             PRIORITY_FIFO: "Priority FIFO",
             LOAD_BALANCING: "Load Balancing",
             DEADLINE_FIRST: "Deadline First"
         };
+
+        // Initialize notification preferences from localStorage
+        let savedNotifications = localStorage.getItem('notificationChannels');
+        if (savedNotifications) {
+            try {
+                const channels = JSON.parse(savedNotifications);
+                setTimeout(() => {
+                    document.querySelectorAll('input[name="notificationChannel"]').forEach(checkbox => {
+                        checkbox.checked = channels.includes(checkbox.value);
+                    });
+                }, 0);
+            } catch (e) {
+                console.error('Error parsing saved notification channels:', e);
+            }
+        }
 
         function updateCardSelection() {
             const checkedInput = document.querySelector('input[name="triageStrategy"]:checked');
